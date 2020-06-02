@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!--    Reversiの座標指定アルゴリズム（ボード生成）  -->
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <!--    CSS    -->
+    <style>
+        #board {
+            background-color: black;
+        }
+
+        td.cell {
+            background-color: white;
+            width: 30px;
+            height: 30px;
+        }
+    </style>
+
+
+    <!--    JavaScript  -->
+    <script>
+        var check = 0;
+        function init() {
+            var b = document.getElementById("board");
+            
+
+            for (var i = 0; i < 3; i++) {
+                var tr = document.createElement("tr"); // <tr>要素の生成
+
+                for (var j = 0; j < 3; j++) {
+                    var td = document.createElement("td");  //要素の生成
+                    //td.〜はhtmlの記述
+                    td.className = "cell";
+                    td.id = "cell" + i + j;
+                    td.onclick = clicked;   //イベントハンドラ（割り込み処理）
+                    tr.appendChild(td); //<tr>要素に<td>要素を挿入
+                }
+                b.appendChild(tr);//tableに<tr>要素を挿入
+            }
+        }
+
+        function clicked(e) {
+            if (check == 0) {
+                document.getElementById("info").textContent = "O";
+            } else {
+                document.getElementById("info").textContent = "X";
+            }
+            check++;
+            check %= 2;
+        }
+
+    </script>
+
+</head>
+
+<!--    html    -->
+
+<body onload="init()">
+    <table id="board"></table>
+    <h2 id="info"></h2>
+</body>
+
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+
+<!--  Carry It   -->
+
+<html>
+
+<head>
+    <title>FlipCards</title>
+    <meta charset="UTF-8">
+
+    <script>
+        //厳密なエラー判定
+        "use strict"
+
+        /*      広域変数      */
+        //１行に２０個
+        var data = [
+            [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 6, 6, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 6, 6, 2, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 6, 6, 0, 0, 2, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 0, 0, 2, 0, 0, 2, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 0, 6, 0, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 0, 0, 0, 6, 0, 6, 6, 6, 0, 6, 6, 6, 6, 0, 0, 1, 1, 6, 6],
+            [6, 0, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 6, 6],
+            [6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 0, 6, 0, 6, 0, 0, 1, 1, 6, 6],
+            [6, 6, 6, 6, 6, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+            [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+        ];
+        var gc, px = 12, py = 8;
+
+
+        /*      初期化関数      */
+        function init() {
+            gc = document.getElementById("soko").getContext("2d");
+            onkeydown = mykeydown;
+            repaint();
+        }
+
+        /*      移動関数       */
+        function u() {
+            mykeydown({ keyCode: 38 });
+        }
+        function d() {
+            mykeydown({ keyCode: 40 });
+        }
+        function l() {
+            mykeydown({ keyCode: 37 });
+        }
+        function r() {
+            mykeydown({ keyCode: 39 });
+        }
+
+        /*      key入力によるイベントハンドラ       */
+        function mykeydown(e) {
+            var dx0 = px, dx1 = px, dy0 = py, dy1 = py;
+            switch (e.keyCode) {
+                case 37: dx0--; dx1 -= 2;
+                    break;
+                case 38: dy0--; dy1 -= 2;
+                    break;
+                case 39: dx0++; dx1 += 2;
+                    break;
+                case 40: dy0++; dy1 += 2;
+                    break;
+            }
+            //荷物なし　＆　壁なし  →　進む
+            if ((data[dy0][dx0] & 0x2) == 0) {  //2bit目を取り出し
+                px = dx0;
+                py = dy0;
+            }
+            //進行方向に荷物あり
+            else if ((data[dy0][dx0] & 0x6) == 2) {
+
+                //その先が  （荷物なし　＆　壁なし）  →　進む
+                if ((data[dy1][dx1] & 0x2) == 0) {
+                    data[dy0][dx0] ^= 2;  //隣の荷物をクリア(2bit目を反転)
+                    data[dy1][dx1] |= 2;  //更に１つ先に荷物をセット（0x0010をOR）
+
+                    //移動処理
+                    px = dx0;
+                    py = dy0;
+                }
+            }
+            repaint();
+        }
+
+        /*      描画関数        */
+        function repaint() {
+            gc.fillStyle = "black";
+            gc.fillRect(0, 0, 800, 440);
+
+            for (var y = 0; y < data.length; y++) {
+                for (var x = 0; x < data[y].length; x++) {
+                    //goalの描画
+                    if (data[y][x] & 0x1) gc.drawImage(imgGoal, x * 40, y * 40, 40, 40);
+
+                    //荷物の描画
+                    if (data[y][x] & 0x2) gc.drawImage(imgLuggage, x * 40, y * 40, 40, 40);
+
+                    //壁の描画
+                    if (data[y][x] == 6) gc.drawImage(imgWall, x * 40, y * 40, 40, 40);
+                }
+            }
+            //プレイヤーの描画
+            gc.drawImage(imgWorker, px * 40, py * 40, 40, 40);
+        }
+    </script>
+</head>
+
+<!--    HTML本文    -->
+
+<body onload="init()">
+    <canvas id="soko" width="800" height="440"></canvas>
+
+    <table>
+        <tr>
+            <td></td>
+            <td><button onclick="u()">U</button></td>
+        </tr>
+        <tr>
+            <td><button onclick="l()">L</button></td>
+            <td></td>
+            <td><button onclick="r()">R</button></td>
+        </tr>
+        <tr>
+            <td></td>
+            <td><button onclick="d()">D</button></td>
+        </tr>
+    </table>
+
+    <img id="imgWall" src="./img/imgWall.png" style="display: none" />
+    <img id="imgGoal" src="./img/imgGoal.png" style="display: none" />
+    <img id="imgWorker" src="./img/imgWorker.png" style="display: none" />
+    <img id="imgLuggage" src="./img/germanpotato.jpeg" style="display: none" />
+
+</body>
+
+</html>

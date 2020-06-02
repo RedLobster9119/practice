@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!--    Reversible Piece  -->
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <!--    CSS    -->
+    <style>
+        #board {
+            background-color: #555555;
+        }
+
+        td.cell {
+            background-color: #FFB27F;
+            width: 60px;
+            height: 60px;
+            margin: 2px;
+            font-size: 50px;
+            text-align: center;
+        }
+
+        td.black {
+            color: black;
+        }
+
+        td.white {
+            color: white;
+        }
+    </style>
+
+    <!--    JavaScript  -->
+    <script>
+
+        "use strict"
+
+
+        /*      広域変数        */
+        //重み付け
+        var WeightData = [
+            [30, -12, 0, -1, -1, 0, -12, 30],
+            [-12, -15, -3, -3, -3, -3, -15, -12],
+            [0, -3, 0, -1, -1, 0, -3, 0],
+            [-1, -3, -1, -1, -1, -1, -3, -1],
+            [-1, -3, -1, -1, -1, -1, -3, -1],
+            [0, -3, 0, -1, -1, 0, -3, 0],
+            [-12, -15, -3, -3, -3, -3, -15, -12],
+            [30, -12, 0, -1, -1, 0, -12, 30]
+        ];
+        var BLACK = 1, WHITE = 2;
+        var data = [];
+        var myTurn = false;
+
+
+        /*      初期化関数      */
+        function init() {
+            var b = document.getElementById("board");
+
+            for (var i = 0; i < 8; i++) {
+                var tr = document.createElement("tr"); // <tr>要素の生成
+                data[i] = [0, 0, 0, 0, 0, 0, 0, 0];
+
+                for (var j = 0; j < 8; j++) {
+                    var td = document.createElement("td");  //要素の生成
+                    //td.〜はhtmlの記述
+                    td.className = "cell";
+                    td.id = "cell" + i + j;
+                    td.onclick = clicked;   //イベントハンドラ（割り込み処理）
+                    tr.appendChild(td); //<tr>要素に<td>要素を挿入
+                }
+                b.appendChild(tr);//tableに<tr>要素を挿入
+            }
+            put(3, 3, BLACK);
+            put(4, 4, BLACK);
+            put(3, 4, WHITE);
+            put(4, 3, WHITE);
+            update();
+        }
+
+        /*      更新関数        */
+        function update() {
+            var numWhite = 0, numBlack = 0;
+            for (var x = 0; x < 8; x++) {
+                for (var y = 0; y < 8; y++) {
+                    if (data[x][y] == WHITE)
+                        numWhite++;
+                    if (data[x][y] == BLACK)
+                        numBlack++;
+                }
+            }
+            document.getElementById("numBlack").textContent = numBlack;
+            document.getElementById("numWhite").textContent = numWhite;
+
+            //置けるかチェック用変数（bool)
+            var blackflip = canFlip(BLACK);
+            var whiteflip = canFlip(WHITE);
+
+            //ゲーム終了表示（全て置く　||  どちらも置けなくなる）
+            if (numWhite + numBlack == 64 || (!blackflip && !whiteflip)) {
+                showMessage("GAME OVER");
+            }
+            //黒が置けない
+            else if (!blackflip) {
+                showMessage("黒スキップ");
+                myTurn = false; //黒がmyTurn
+            }
+            //白が置けない
+            else if (!whiteflip) {
+                showMessage("白スキップ");
+                myTurn = true;
+            }
+            else {
+                myTurn = !myTurn;
+            }
+            //CPUの番のとき、1secのみ考える時間あり
+            if (!myTurn)
+                setTimeout(think, 1000);
+        }
+
+
+        /*  メッセージ表示関数      */
+        function showMessage(str) {
+            document.getElementById("message").textContent = str;
+            //メッセージを2sec表示
+            setTimeout(function () {
+                document.getElementById("message").textContent = "";
+            }, 2000);
+        }
+
+
+        /*      盤上のセルクリック時のコールバック関数      */
+        function clicked(e) {
+            //CPU考え中
+            if (!myTurn)
+                return;
+            
+            var id = e.target.id;   //clickされた場所を記録
+
+            //縦i、横jの位置取り出し（ボードは文字列表記のため）
+            var i = parseInt(id.charAt(4)); 
+            var j = parseInt(id.charAt(5));
+
+            //反転する石を配列で集める
+            var flipped = getFlipCells(i, j, BLACK);
+            //ひっくり返せる時
+            if (flipped.length > 0) {
+                for (var k = 0; k < flipped.length; k++) {
+                    put(flipped[k][0], flipped[k][1], BLACK);
+                }
+                put(i, j, BLACK);
+                update();
+            }
+        }
+
+
+        /*        (i,j)にcolor色を置く        */
+        function put(i, j, color) {
+            var c = document.getElementById("cell" + i + j);
+            c.textContent = "●";
+            c.className = "cell " + (color == BLACK ? "black" : "white");
+            data[i][j] = color;
+        }
+
+
+        /*      コンピュータ思考関数        */
+        function think() {
+            var highScore = -1000;  //最高合計点の初期値
+            var px = -1, py = -1;   //候補座標
+
+            //盤上を全探索
+            for (var x = 0; x < 8; x++) {
+                for (var y = 0; y < 8; y++) {
+                    //現在の盤上をtmpDataにコピーさせる
+                    var tmpData = copyData();
+                    //(x,y)に置いたときに反転できる座標配列を求める
+                    var flipped = getFlipCells(x, y, WHITE);
+                    //反転させられるコマがある時
+                    if (flipped.length > 0) {
+                        for (var i = 0; i < flipped.length; i++) {
+                            var p = flipped[i][0];
+                            var q = flipped[i][1];
+                            //tmpDataに再現
+                            tmpData[p][q] = WHITE;
+                            tmpData[x][y] = WHITE;
+                        }
+                        //重み付けデータを基に、合計点を計算（そのターンでの最大値を目指す）
+                        var score = calcWeightData(tmpData);
+                        //合計点更新
+                        if (score > highScore) {
+                            highScore = score;
+                            px = x, py = y;
+                        }
+                    }
+                }
+            }
+            //白をどこかにおけるとき
+            if (px >= 0 && py >= 0) {
+                //置いたときに反転できるコマ座標を取得
+                var flipped = getFlipCells(px, py, WHITE);
+                if (flipped.length > 0) {
+                    for (var k = 0; k < flipped.length; k++) {
+                        put(flipped[k][0], flipped[k][1], WHITE);
+                    }
+                }
+                put(px, py, WHITE);
+            }
+            update();
+        }
+
+
+        /*      重み付け計算        */
+        function calcWeightData(tmpData) {
+            var score = 0;
+            for (var x = 0; x < 8; x++) {
+                for (var y = 0; y < 8; y++) {
+                    if (tmpData[x][y] == WHITE)
+                        score += WeightData[x][y];
+                }
+            }
+            return score;
+        }
+
+
+        /*      コマテーブルデータをコピー  */
+        function copyData(){
+            var tmpData=[];
+            for(var x=0;x<8;x++){
+                tmpData[x]=[];
+                for(var y=0;y<8;y++){
+                    tmpData[x][y]=data[x][y];
+                }
+            }
+            return tmpData;
+        }
+
+
+        /*      挟めるコマがあるか      */
+        function canFlip(color) {
+            for (var x = 0; x < 8; x++) {
+                for (var y = 0; y < 8; y++) {
+                    var flipped = getFlipCells(x, y, color);
+                    if (flipped.length > 0) return true;
+                }
+            }
+            return false;
+        }
+
+
+        /*      (i,j)にコマを置いたときにコマを挟めるか？   */
+        function getFlipCells(i, j, color) {
+
+            //すでにコマが置いてある時
+            if (data[i][j] == BLACK || data[i][j] == WHITE)
+                return [];
+
+            //相手を挟めるか、左上、上、右上、左、右、左下、下、右下とチェック
+            var dirs = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+            var result = [];
+            for (var p = 0; p < dirs.length; p++) {
+                var flipped = getFlipCellsOneDir(i, j, dirs[p][0], dirs[p][1], color);
+                //concatでflippedの要素を結合（追加）
+                result = result.concat(flipped);
+            }
+            return result;  //置けるコマの位置をすべて格納して返す
+        }
+
+
+        /*      (i,j)にコマを置いたときに、(dx,dy)方向でコマを挟めるか  */
+        function getFlipCellsOneDir(i, j, dx, dy, color) {
+            var x = i + dx;
+            var y = j + dy;
+            var flipped = [];
+
+            //盤外、同色、空ならfalse
+            if (x < 0 || y < 0 || x > 7 || y > 7 || data[x][y] == color || data[x][y] == 0) return [];
+
+            //とりあえず最後に追加
+            flipped.push([x, y]);
+
+            while (true) {
+                //１方向について、進めていく
+                x += dx;
+                y += dy;
+                //盤外、空のとき
+                if (x < 0 || y < 0 || x > 7 || y > 7 || data[x][y] == 0)
+                    return [];
+                //自分の色で挟めた時
+                if(data[x][y] == color)
+                    return flipped;
+                else flipped.push([x,y]);
+            }
+        }
+    </script>
+
+</head>
+
+<!--    html    -->
+
+<body onload="init()">
+    
+    <h2>
+        黒（あなた）：<span id="numBlack"></span>枚
+        白（ＣＰＵ）：<span id="numWhite"></span>枚
+    </h2>
+    <table id="board"></table>
+    <h2 id="message"></h2>
+</body>
+
+</html>
